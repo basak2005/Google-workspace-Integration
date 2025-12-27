@@ -7,7 +7,8 @@ import json
 import os
 from datetime import datetime
 from typing import Any
-from config import DATABASE_PATH
+
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), "tokens.db")
 
 
 def init_db():

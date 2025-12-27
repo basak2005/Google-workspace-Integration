@@ -1,23 +1,14 @@
 import os
 from dotenv import load_dotenv
 
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 load_dotenv()
-
-# Disable HTTPS requirement for local development only
-if os.getenv("ENVIRONMENT", "development") == "development":
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
-# Dynamic redirect URI for deployment
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-GOOGLE_REDIRECT_URI = f"{BASE_URL}/auth/callback"
-
-# Database path (use DATA_DIR for deployed environments with volumes)
-DATA_DIR = os.getenv("DATA_DIR", os.path.dirname(__file__))
-DATABASE_PATH = os.path.join(DATA_DIR, "tokens.db")
+GOOGLE_REDIRECT_URI = "http://localhost:8000/auth/callback"
 
 # Google API Scopes - All products
 SCOPES = [

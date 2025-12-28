@@ -1,0 +1,184 @@
+/* General Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: sans-serif;
+}
+
+.dashboard-container {
+  background-color: #e9b36b; /* The ochre background */
+  min-height: 100vh;
+  width: 100vw;
+  color: #2d2d2d;
+}
+
+/* Navbar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  width: 100%;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.nav-links a {
+  margin-right: 20px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+.logo {
+  font-size: 24px;
+  font-weight: 900;
+  font-style: italic;
+}
+.Login {
+  width: 70px;
+  height: 40px;
+  background: rgb(61, 58, 58);
+  border-radius: 4px;
+}
+
+/* Hero */
+.hero {
+  padding: 40px;
+  width: 100%;
+}
+.hero h1 {
+  font-size: 48px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+.hero p {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Grid Layout */
+.grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  padding: 0 40px 40px;
+  width: 70%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.full-width {
+  grid-column: span 2;
+}
+
+/* Cards */
+.card-section h2 {
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+.card {
+  background-color: #d9c4a9d0; /* Card color from design */
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  min-height: 300px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+/* Create Event Specifics */
+.create-event-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.create-event-card input {
+  background-color: transparent;
+  width: 70%;
+  color: #3c3939;
+  height: 90%;
+  border: none;
+  font-size: 18px;
+  outline: none;
+}
+.create-event-card input[type="date"] {
+margin-left: 2rem;
+}
+.create-event-card span {
+  font-size: 20px;
+  color: #3c3939;
+  margin-bottom: 5px;
+}
+.create-event-card input::placeholder {
+  color: #3c3939;
+}
+.input-row {
+  height: 40px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+.create-event-card .add-email-btn {
+  margin-left: 5rem;
+  border-radius: 2rem;
+  padding: 5px 15px;
+}
+.save-btn {
+  background: black;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin-right: auto;
+  margin-left: auto;
+  border-radius: 20px;
+  width: max-content;
+}
+
+/* Calendar Specifics */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+.calendar-day {
+  aspect-ratio: 1;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+}
+
+/* Notes */
+textarea {
+  width: 100%;
+  height: 200px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  outline: none;
+  font-style: italic;
+}
+
+/* Footer */
+.footer {
+  background: #333;
+  color: #d9c4a9;
+  padding: 40px;
+}
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+}
+.socials {
+  margin-top: 10px;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .full-width {
+    grid-column: span 1;
+  }
+  .hero h1 {
+    font-size: 32px;
+  }
+}

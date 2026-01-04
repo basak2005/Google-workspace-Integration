@@ -2,10 +2,6 @@ import './App.css';
 import Calendar from './Calendar.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import api from './api';
-
-
-
-
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -15,7 +11,78 @@ const App = () => {
   const [eventsError, setEventsError] = useState('');
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [taskText, setTaskText] = useState('');
+  const [taskHeading, setTaskHeading] = useState('');
   const [taskStatus, setTaskStatus] = useState('');
+
+  const loadTasks = useCallback(async () => {
+    const container = document.getElementById('tasks-container');
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+
+    if (!isAuthenticated) {
+      return;
+    }
+
+    try {
+      const res = await api.get('/tasks/', { withCredentials: true });
+      const tasks = res.data?.tasks ?? res.data ?? [];
+
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'input-row';
+        empty.textContent = 'No tasks found';
+        container.appendChild(empty);
+        return;
+      }
+
+      tasks.forEach((t) => {
+        const id = t?.id ?? t?.task_id ?? t?.taskId;
+        const title = t?.title ?? t?.name ?? '(no title)';
+        const completed = t?.status === 'completed' || t?.completed === true;
+        const row = document.createElement('div');
+        row.className = 'input-row';
+        const label = document.createElement('span');
+        label.style.margin = '0 8px';
+        label.textContent = title;
+        const checkbox = document.createElement('button');
+        checkbox.className = 'save-btn';
+        checkbox.textContent = completed ? 'Completed' : 'Task Done';
+        checkbox.title = completed ? 'Task already completed' : 'Mark task as done';
+        checkbox.disabled = !!completed;
+        checkbox.onclick = async () => {
+          try {
+            await api.put(`/tasks/${id}/complete`, {}, { withCredentials: true });
+            checkbox.textContent = 'Completed';
+            checkbox.disabled = true;
+          } catch (error) {
+            alert(error.response?.data?.detail ?? error.message ?? 'Failed to mark task as done');
+          }
+        };
+
+        const del = document.createElement('button');
+        del.className = 'save-btn';
+        del.textContent = 'Delete';
+        del.title = 'Delete task';
+        del.onclick = async () => {
+          try {
+            await api.delete(`/tasks/${id}`, { withCredentials: true });
+            row.remove();
+          } catch (error) {
+            alert(error.response?.data?.detail ?? error.message ?? 'Failed to delete task');
+          }
+        };
+        row.appendChild(label);
+        row.appendChild(checkbox);
+        row.appendChild(del);
+        container.appendChild(row);
+      });
+    } catch (error) {
+      alert(error.response?.data?.detail ?? error.message ?? 'Failed to load tasks');
+    }
+  }, [isAuthenticated]);
 
   const authBaseUrl = api.defaults.baseURL ?? 'http://localhost:8000';
 
@@ -132,8 +199,12 @@ const App = () => {
       setTaskStatus('Please login with Google first.');
       return;
     }
-
-    const text = taskText.trim();
+    const head = taskHeading.trim();
+    const text = taskText.trim();//here is a trim and store only trimed text 
+    if (!head) {
+      setTaskStatus('Please enter a task headline.');
+      return;
+    }
     if (!text) {
       setTaskStatus('Please enter a task.');
       return;
@@ -147,8 +218,8 @@ const App = () => {
     for (const url of endpointsToTry) {
       try {
         const res = await api.post(url, {
-          "title": text,
-          "notes": "Completed via EvenetX",
+          "title": head,
+          "notes": text,
           "task_list_id": "@default"
         }, { withCredentials: true });
         if (res && res.status >= 200 && res.status < 300) {
@@ -163,6 +234,8 @@ const App = () => {
     if (saved) {
       setTaskStatus('Task saved successfully.');
       setTaskText('');
+      setTaskHeading('');
+      await loadTasks();
     } else {
       const msg = lastError?.response?.data?.detail ?? lastError?.message ?? 'Failed to save task';
       setTaskStatus(msg);
@@ -176,13 +249,15 @@ const App = () => {
   useEffect(() => {
     if (isAuthenticated) {
       refreshUpcomingEvents();
+      loadTasks();
     } else {
       setUpcomingEvents([]);
       setEventsError('');
       setTaskText('');
       setTaskStatus('');
+      loadTasks();
     }
-  }, [isAuthenticated, refreshUpcomingEvents]);
+  }, [isAuthenticated, refreshUpcomingEvents, loadTasks]);
   return (
     <div className="dashboard-container">
       {/* Navigation */}
@@ -213,7 +288,7 @@ const App = () => {
       {/* Hero Section */}
       <header className="hero">
         <h1>EvenetX a google Workspace Hub</h1>
-        <p>Make all google project at one place</p>
+        <p>Make all Events at one place</p>
       </header>
 
       {/* Content Grid */}
@@ -414,94 +489,21 @@ const App = () => {
                 <h2>Upcoming Task</h2>
                 <div className="card taskshow-card">
                   <div id="tasks-container" className="upcoming-events-list" style={{ marginBottom: '8px' }}></div>
-                  <div className="buttion">
-                    <button
-                      type="button"
-                      className="save-btn"
-                      disabled={!isAuthenticated}
-                      title={isAuthenticated ? 'Refresh tasks' : 'Login required'}
-                      onClick={async () => {
-                        if (!isAuthenticated) {
-                          alert('Please login with Google first.');
-                          return;
-                        }
-                        try {
-                          const res = await api.get('/tasks/', { withCredentials: true });
-                          const tasks = res.data?.tasks ?? res.data ?? [];
-                          const container = document.getElementById('tasks-container');
-                          if (!container) return;
-                          container.innerHTML = '';
-                          if (!Array.isArray(tasks) || tasks.length === 0) {
-                            const empty = document.createElement('div');
-                            empty.className = 'input-row';
-                            empty.textContent = 'No tasks found';
-                            container.appendChild(empty);
-                            return;
-                          }
-                          tasks.forEach((t) => {
-                            const id = t?.id ?? t?.task_id ?? t?.taskId;
-                            const title = t?.title ?? t?.name ?? '(no title)';
-                            const completed = t?.status === 'completed' || t?.completed === true;
-
-                            const row = document.createElement('div');
-                            row.className = 'input-row';
-
-                            const checkbox = document.createElement('input');
-                            checkbox.type = 'checkbox';
-                            checkbox.checked = Boolean(completed);
-                            checkbox.title = checkbox.checked ? 'Mark as not done' : 'Mark as done';
-                            checkbox.onchange = async (ev) => {
-                              try {
-                                if (ev.target.checked) {
-                                  await api.post(`/tasks/${id}/complete`, {
-                                  }, { withCredentials: true });
-                                } else {
-                                  await api.patch(`/tasks/${id}`, { status: 'needsAction' }, { withCredentials: true });
-                                }
-                              } catch (error) {
-                                ev.target.checked = !ev.target.checked;
-                                alert(error.response?.data?.detail ?? error.message ?? 'Failed to update task');
-                              }
-                            };
-
-                            const label = document.createElement('span');
-                            label.style.margin = '0 8px';
-                            label.textContent = title;
-
-                            const del = document.createElement('button');
-                            del.className = 'save-btn';
-                            del.textContent = 'Delete';
-                            del.title = 'Delete task';
-                            del.onclick = async () => {
-                              try {
-                                await api.delete(`/tasks/${id}`, { withCredentials: true });
-                                row.remove();
-                              } catch (error) {
-                                alert(error.response?.data?.detail ?? error.message ?? 'Failed to delete task');
-                              }
-                            };
-
-                            row.appendChild(checkbox);
-                            row.appendChild(label);
-                            row.appendChild(del);
-                            container.appendChild(row);
-                          });
-                        } catch (error) {
-                          alert(error.response?.data?.detail ?? error.message ?? 'Failed to load tasks');
-                        }
-                      }}
-                    >
-                      Refresh Tasks
-                    </button>
-                  </div>
                 </div>
               </section>
             </div>
           </div>
-        </div>
+        </div >
         <section className="card-section full-width">
           <h2>Your Tasks</h2>
           <div className="card notes-card">
+            <div className='input-row'>
+              <input type="text"
+                placeholder="Enter Task Headline"
+                value={taskHeading}
+                onChange={(e) => setTaskHeading(e.target.value)}
+              />
+            </div>
             <textarea
               id="task-text"
               placeholder="Write your event Tasks here..."
@@ -523,7 +525,7 @@ const App = () => {
                 {taskStatus}
               </div>
             )}
-            <div className="input-row" style={{ marginTop: '8px' }}>
+            <div className="input" style={{ marginTop: '8px' }}>
               <button
                 type="button"
                 className="save-btn"
@@ -536,9 +538,16 @@ const App = () => {
             </div>
           </div>
         </section>
-      </main>
+        <section>
+          <h2>Your Task Assistence</h2>
+          <div className="card ai-response-card full-width">
+            <div className="response-content full-width">
+            </div>
+          </div>
+        </section>
+      </main >
       {/* Footer */}
-      <footer className="footer">
+      <footer footer className="footer" >
         <div className="footer-content">
           <div className="sitemap">
             <p>SITEMAP</p>
@@ -550,7 +559,7 @@ const App = () => {
             <span>LEGAL</span>
           </div>
         </div>
-      </footer>
+      </footer >
     </div >
   );
 };

@@ -72,21 +72,20 @@
 }
 
 /* Cards */
-.eventmanegament{
+.eventmanegament {
   display: flex;
-  flex-direction: row; 
+  flex-direction: row;
 }
-.taskshow{
-  margin-left: 6rem;
+.taskshow {
+  margin-left: 3rem;
   margin-top: -3rem;
-  width: 40%;
-  
+  min-width: 40%;
+  overflow: visible;
 }
 
 .card-section h2 {
   margin-bottom: 15px;
   font-size: 24px;
-
 }
 .card {
   background-color: #d9c4a9d0; /* Card color from design */
@@ -123,16 +122,16 @@
   margin-left: 2rem;
   width: 10rem;
 }
-.startDate::-webkit-calendar-picker-indicator{
+.startDate::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
-.startTime::-webkit-calendar-picker-indicator{
+.startTime::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
-.endDate::-webkit-calendar-picker-indicator{
+.endDate::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
-.endTime::-webkit-calendar-picker-indicator{
+.endTime::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 .create-event-card span {
@@ -177,6 +176,28 @@
   padding-top: 5%;
   border-radius: 24px;
 }
+.upcoming-events-list {
+  min-height: 310px;
+}
+.upcoming-events-list span {
+  font-size: large;
+  font-style: oblique;
+  font-weight: bolder;
+  color: gray;
+}
+.upcoming-events-list button {
+  width: max-content;
+  border-radius: 20px;
+  background-color: rgba(243, 175, 67, 0.947);
+  border: 1px solid gray;
+  color: #3c3939;
+  float: right;
+  margin-left: 0 !important;
+  margin-top: 0;
+  white-space: wrap;
+  margin-bottom: 2px;
+}
+
 .upcoming-card {
   min-height: 25rem;
   width: 60%;
@@ -189,7 +210,7 @@
   flex-direction: column;
   color: #4a4a49;
 }
-.upcoming-card button{
+.upcoming-card button {
   margin-top: 3rem;
   margin-left: 45%;
   font-size: medium;
@@ -208,11 +229,29 @@
   background: rgba(0, 0, 0, 0.05);
   border-radius: 8px;
 }
+.notes-card input[type="text"] {
+  background-color: transparent;
+  width: 100%;
+  height: 3rem;
+  border: none;
+  outline: none;
+  font-size: 20px;
+  font-weight: bold;
+}
+.notes-card input[type="text"]::placeholder {
+  color: #89773c;
+  font-weight: bold;
+}
+.notes-card .input-row {
+  width: 70%;
+  border-bottom: 1px solid rgba(71, 71, 71, 0.659);
+  margin-bottom: 10px;
+}
 
 /* Notes */
 textarea {
   width: 100%;
-  height: 200px;
+  min-height: 140px;
   background: transparent;
   border: none;
   font-size: 18px;

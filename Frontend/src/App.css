@@ -1,0 +1,289 @@
+/* General Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: sans-serif;
+}
+
+.dashboard-container {
+  background-color: #e9b36b; /* The ochre background */
+  min-height: 100vh;
+  width: 100vw;
+  color: #2d2d2d;
+}
+
+/* Navbar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  width: 100%;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.nav-links a {
+  margin-right: 20px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+.logo {
+  font-size: 24px;
+  font-weight: 900;
+  font-style: italic;
+}
+.Login {
+  width: 50px;
+  height: 50px;
+  background: rgb(61, 58, 58);
+  border-radius: 60%;
+}
+
+/* Hero */
+.hero {
+  padding: 40px;
+  width: 100%;
+}
+.hero h1 {
+  font-size: 48px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+.hero p {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Grid Layout */
+.grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  padding: 0 40px 40px 0;
+  width: 70%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.full-width {
+  grid-column: span 2;
+}
+
+/* Cards */
+.eventmanegament {
+  display: flex;
+  flex-direction: row;
+}
+.taskshow {
+  margin-left: 3rem;
+  margin-top: -3rem;
+  min-width: 40%;
+  overflow: visible;
+}
+
+.card-section h2 {
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+.card {
+  background-color: #d9c4a9d0; /* Card color from design */
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  min-height: 100px;
+}
+/* Create Event Specifics */
+.create-event-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.create-event-card input {
+  background-color: transparent;
+  color: #3c3939;
+  width: 100%;
+  height: 90%;
+  border: none;
+  font-size: 18px;
+  outline: none;
+}
+.create-event-card span {
+  padding-left: 1%;
+}
+
+.create-event-card input[type="date"] {
+  margin-left: 1rem;
+  width: 10rem;
+}
+.create-event-card input[type="time"] {
+  margin-left: 2rem;
+  width: 10rem;
+}
+.startDate::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+.startTime::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+.endDate::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+.endTime::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+.create-event-card span {
+  font-size: 20px;
+  color: #3c3939;
+  margin-bottom: 5px;
+}
+.create-event-card input::placeholder {
+  color: #3c3939;
+}
+.input-row {
+  height: 40px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+.create-event-card .add-email-btn {
+  margin-left: 5rem;
+  border-radius: 2rem;
+  padding: 5px 15px;
+}
+.save-btn {
+  background: black;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin-right: auto;
+  margin-left: auto;
+  border-radius: 20px;
+  width: max-content;
+}
+.clock-section {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.clock-section iframe {
+  width: 100%;
+  text-align: center;
+  border: none;
+  margin-top: 4%;
+  background-color: white;
+  padding-top: 5%;
+  border-radius: 24px;
+}
+.upcoming-events-list {
+  min-height: 310px;
+}
+.upcoming-events-list span {
+  font-size: large;
+  font-style: oblique;
+  font-weight: bolder;
+  color: gray;
+}
+.upcoming-events-list button {
+  width: max-content;
+  border-radius: 20px;
+  background-color: rgba(243, 175, 67, 0.947);
+  border: 1px solid gray;
+  color: #3c3939;
+  float: right;
+  margin-left: 0 !important;
+  margin-top: 0;
+  white-space: wrap;
+  margin-bottom: 2px;
+}
+
+.upcoming-card {
+  min-height: 25rem;
+  width: 60%;
+  font-size: x-large;
+  background-color: #d9c4a9d0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  flex-direction: column;
+  color: #4a4a49;
+}
+.upcoming-card button {
+  margin-top: 3rem;
+  margin-left: 45%;
+  font-size: medium;
+}
+::-webkit-scrollbar {
+  display: none;
+}
+/* Calendar Specifics */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+.calendar-day {
+  aspect-ratio: 1;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+}
+.notes-card input[type="text"] {
+  background-color: transparent;
+  width: 100%;
+  height: 3rem;
+  border: none;
+  outline: none;
+  font-size: 20px;
+  font-weight: bold;
+}
+.notes-card input[type="text"]::placeholder {
+  color: #89773c;
+  font-weight: bold;
+}
+.notes-card .input-row {
+  width: 70%;
+  border-bottom: 1px solid rgba(71, 71, 71, 0.659);
+  margin-bottom: 10px;
+}
+
+/* Notes */
+textarea {
+  width: 100%;
+  min-height: 140px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  outline: none;
+  font-style: italic;
+}
+
+/* Footer */
+.footer {
+  background: #333;
+  color: #d9c4a9;
+  padding: 40px;
+}
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+}
+.socials {
+  margin-top: 10px;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .full-width {
+    grid-column: span 1;
+  }
+  .hero h1 {
+    font-size: 32px;
+  }
+}

@@ -178,6 +178,9 @@
 }
 .upcoming-events-list {
   min-height: 310px;
+  font-weight: bold;
+  color: gray;
+  font-family: Zalando Sans SemiExpanded;
 }
 .upcoming-events-list span {
   font-size: large;
@@ -202,6 +205,7 @@
   min-height: 25rem;
   width: 60%;
   font-size: x-large;
+  font-style: italic;
   background-color: #d9c4a9d0;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 20px;
@@ -257,6 +261,10 @@ textarea {
   font-size: 18px;
   outline: none;
   font-style: italic;
+}
+.ai-response-card {
+  margin-top: 2rem;
+  
 }
 
 /* Footer */

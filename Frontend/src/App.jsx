@@ -5,6 +5,7 @@ import api from './api';
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [userName, setusername] = useState('');
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authError, setAuthError] = useState('');
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -14,6 +15,7 @@ const App = () => {
   const [taskHeading, setTaskHeading] = useState('');
   const [taskStatus, setTaskStatus] = useState('');
 
+  
   const loadTasks = useCallback(async () => {
     const container = document.getElementById('tasks-container');
     if (!container) {
@@ -29,7 +31,6 @@ const App = () => {
     try {
       const res = await api.get('/tasks/', { withCredentials: true });
       const tasks = res.data?.tasks ?? res.data ?? [];
-
       if (!Array.isArray(tasks) || tasks.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'input-row';
@@ -37,7 +38,6 @@ const App = () => {
         container.appendChild(empty);
         return;
       }
-
       tasks.forEach((t) => {
         const id = t?.id ?? t?.task_id ?? t?.taskId;
         const title = t?.title ?? t?.name ?? '(no title)';
@@ -61,7 +61,6 @@ const App = () => {
             alert(error.response?.data?.detail ?? error.message ?? 'Failed to mark task as done');
           }
         };
-
         const del = document.createElement('button');
         del.className = 'save-btn';
         del.textContent = 'Delete';
@@ -98,6 +97,8 @@ const App = () => {
         try {
           const userRes = await api.get('/user/me', { withCredentials: true });
           const email = userRes.data?.email ?? userRes.data?.name ?? '';
+          const uname = userRes.data?.name ?? '';
+          setusername(uname);
           setUserEmail(email);
         } catch (userErr) {
           console.error('Fetching user profile failed:', userErr);
@@ -107,12 +108,13 @@ const App = () => {
       }
       setIsAuthenticated(false);
       setUserEmail('');
+      setusername('');
     } catch (error) {
       console.error('Auth status check failed:', error);
       setIsAuthenticated(false);
       setUserEmail('');
       setAuthError(error.response?.data?.detail ?? 'Authentication check failed');
-    } finally {
+    } finally { 
       setIsCheckingAuth(false);
     }
   }, []);
@@ -273,7 +275,7 @@ const App = () => {
             <span>Checking session...</span>
           ) : isAuthenticated ? (
             <div className="auth-status">
-              <span>{userEmail || 'Authenticated user'}</span>
+              <span>{userName || 'Authenticated user'}</span>
               <button className="login-btn" onClick={handleLogout}>Logout</button>
             </div>
           ) : (
@@ -540,9 +542,8 @@ const App = () => {
         </section>
         <section>
           <h2>Your Task Assistence</h2>
-          <div className="card ai-response-card full-width">
-            <div className="response-content full-width">
-            </div>
+          <div className="card ai-response-card">
+
           </div>
         </section>
       </main >

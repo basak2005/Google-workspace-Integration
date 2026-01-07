@@ -5,6 +5,8 @@ import api from './api';
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [userName, setusername] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authError, setAuthError] = useState('');
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -13,6 +15,8 @@ const App = () => {
   const [taskText, setTaskText] = useState('');
   const [taskHeading, setTaskHeading] = useState('');
   const [taskStatus, setTaskStatus] = useState('');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
 
   const loadTasks = useCallback(async () => {
     const container = document.getElementById('tasks-container');
@@ -29,7 +33,6 @@ const App = () => {
     try {
       const res = await api.get('/tasks/', { withCredentials: true });
       const tasks = res.data?.tasks ?? res.data ?? [];
-
       if (!Array.isArray(tasks) || tasks.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'input-row';
@@ -37,7 +40,6 @@ const App = () => {
         container.appendChild(empty);
         return;
       }
-
       tasks.forEach((t) => {
         const id = t?.id ?? t?.task_id ?? t?.taskId;
         const title = t?.title ?? t?.name ?? '(no title)';
@@ -61,7 +63,6 @@ const App = () => {
             alert(error.response?.data?.detail ?? error.message ?? 'Failed to mark task as done');
           }
         };
-
         const del = document.createElement('button');
         del.className = 'save-btn';
         del.textContent = 'Delete';
@@ -98,7 +99,12 @@ const App = () => {
         try {
           const userRes = await api.get('/user/me', { withCredentials: true });
           const email = userRes.data?.email ?? userRes.data?.name ?? '';
+          const uname = userRes.data?.name ?? '';
+          const profilePictureUrl = userRes.data?.profile_picture ?? userRes.data?.picture ?? '';
+          console.log('User profile response:', userRes.data);
+          setusername(uname);
           setUserEmail(email);
+          setProfilePicture(profilePictureUrl);
         } catch (userErr) {
           console.error('Fetching user profile failed:', userErr);
           setAuthError(userErr.response?.data?.detail ?? 'Unable to load user profile');
@@ -107,10 +113,15 @@ const App = () => {
       }
       setIsAuthenticated(false);
       setUserEmail('');
+      setusername('');
+      setProfilePicture('');
+      setIsProfileMenuOpen(false);
     } catch (error) {
       console.error('Auth status check failed:', error);
       setIsAuthenticated(false);
       setUserEmail('');
+      setProfilePicture('');
+      setIsProfileMenuOpen(false);
       setAuthError(error.response?.data?.detail ?? 'Authentication check failed');
     } finally {
       setIsCheckingAuth(false);
@@ -120,10 +131,12 @@ const App = () => {
   // Handle Google Login - redirect to FastAPI OAuth endpoint
   const handleGoogleLogin = async () => {
     // Redirect to your FastAPI Google OAuth endpoint
+    setIsProfileMenuOpen(false);
     window.location.href = `${authBaseUrl}/auth/login`;
   };
 
   const handleLogout = async () => {
+    setIsProfileMenuOpen(false);
     try {
       await api.post('/auth/logout', {}, { withCredentials: true });
     } catch (error) {
@@ -132,9 +145,38 @@ const App = () => {
     } finally {
       setIsAuthenticated(false);
       setUserEmail('');
+      setProfilePicture('');
       checkAuthStatus();
     }
   };
+
+  const toggleProfileMenu = () => {
+    if (!isAuthenticated) {
+      return;
+    }
+    setIsProfileMenuOpen((prev) => !prev);
+  };
+
+  const closeProfileMenu = () => {
+    setIsProfileMenuOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfileMenuOpen]);
 
   const refreshUpcomingEvents = useCallback(async () => {
     if (!isAuthenticated) {
@@ -256,8 +298,12 @@ const App = () => {
       setTaskText('');
       setTaskStatus('');
       loadTasks();
+      setIsProfileMenuOpen(false);
     }
   }, [isAuthenticated, refreshUpcomingEvents, loadTasks]);
+
+  const userInitial = (userName || userEmail || '?').charAt(0).toUpperCase();
+
   return (
     <div className="dashboard-container">
       {/* Navigation */}
@@ -268,22 +314,67 @@ const App = () => {
           <a href="#">Contact Us</a>
         </div>
         <div className="logo">EvenetX</div>
-        <div className="Login">
+        <div className="authuserinfo">
           {isCheckingAuth ? (
             <span>Checking session...</span>
           ) : isAuthenticated ? (
-            <div className="auth-status">
-              <span>{userEmail || 'Authenticated user'}</span>
-              <button className="login-btn" onClick={handleLogout}>Logout</button>
+            <div className="Login">
+              <button
+                type="button"
+                className="login-avatar"
+                onClick={toggleProfileMenu}
+                aria-haspopup="dialog"
+                aria-expanded={isProfileMenuOpen}
+              >
+                {profilePicture ? (
+                  <img
+                    src={profilePicture}
+                    alt="Profile"
+                    className="profile-avatar-image"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="profile-initial">{userInitial}</span>
+                )}
+              </button>
             </div>
           ) : (
-            <button className="login-btn" onClick={handleGoogleLogin}>Login with Google</button>
+            <button className="login-btn" onClick={handleGoogleLogin}>Google Login</button>
           )}
           {authError && !isCheckingAuth && (
             <span className="auth-error">{authError}</span>
           )}
         </div>
       </nav>
+
+      {isProfileMenuOpen && isAuthenticated && (
+        <div className="profile-overlay" onClick={closeProfileMenu} role="dialog" aria-modal="true">
+          <div className="profile-card" onClick={(event) => event.stopPropagation()}>
+            {profilePicture ? (
+              <img
+                src={profilePicture}
+                alt="Profile"
+                className="profile-card-image"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="profile-card-placeholder">{userInitial}</div>
+            )}
+            <h3 className="profile-name">{userName || 'Authenticated user'}</h3>
+            {userEmail && <p className="profile-email">{userEmail}</p>}
+            <button
+              type="button"
+              className="logout-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleLogout();
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <header className="hero">
@@ -540,8 +631,9 @@ const App = () => {
         </section>
         <section>
           <h2>Your Task Assistence</h2>
-          <div className="card ai-response-card full-width">
-            <div className="response-content full-width">
+          <div className="card ai-response-card">
+            <div className="placeholder-content">
+              <span>AI Task Assistence Coming Soon...</span>
             </div>
           </div>
         </section>
@@ -549,9 +641,15 @@ const App = () => {
       {/* Footer */}
       <footer footer className="footer" >
         <div className="footer-content">
-          <div className="sitemap">
-            <p>SITEMAP</p>
-            <div className="socials">FB IG TW LI</div>
+          <div className="socials">
+            <ol>
+              <ul>Facebook</ul>
+              <ul>
+                Instagram
+              </ul>
+              <ul>Twitter</ul>
+              <ul>LinkedIn</ul>
+            </ol>
           </div>
           <div className="footer-links">
             <span>MENU</span>

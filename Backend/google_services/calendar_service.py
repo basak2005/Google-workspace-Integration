@@ -88,8 +88,14 @@ def create_event(
     }
 
 
-def create_meet_event(credentials: Credentials, summary: str = "FastAPI Google Meet", duration_minutes: int = 60):
-    """Create a calendar event with Google Meet link"""
+def create_meet_event(credentials: Credentials, summary: str, duration_minutes: int = 60):
+    """Create a calendar event with Google Meet link
+    
+    Args:
+        credentials: Google OAuth credentials
+        summary: Name/title of the Google Meet meeting
+        duration_minutes: Duration of the meeting in minutes (default: 60)
+    """
     service = get_calendar_service(credentials)
 
     # Create event starting 1 hour from now

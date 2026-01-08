@@ -17,6 +17,11 @@ class CreateEventRequest(BaseModel):
     timezone: Optional[str] = "IST"
 
 
+class CreateMeetRequest(BaseModel):
+    summary: str  # Name of the Google Meet meeting
+    duration_minutes: Optional[int] = 60  # Duration in minutes (default: 60)
+
+
 @router.get("/events")
 def get_events():
     credentials = get_credentials()
@@ -45,8 +50,9 @@ def create_calendar_event(request: CreateEventRequest):
 
 
 @router.post("/meet")
-def create_meet():
+def create_meet(request: CreateMeetRequest):
+    """Create a Google Meet event with a custom name"""
     credentials = get_credentials()
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated")
-    return {"meet_link": create_meet_event(credentials)}
+    return {"meet_link": create_meet_event(credentials, summary=request.summary, duration_minutes=request.duration_minutes or 60)}

@@ -1,6 +1,8 @@
 import './App.css';
 import Calendar from './Calendar.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFacebook, faInstagram, faSquareTwitter, faSquareLinkedin } from '@fortawesome/free-brands-svg-icons';
 import api from './api';
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -483,6 +485,7 @@ const App = () => {
                   lastError?.message ||
                   'Failed to create event';
                 alert(msg);
+
               }
             }}
           >
@@ -620,7 +623,10 @@ const App = () => {
               <button
                 type="button"
                 className="save-btn"
-                onClick={handleTaskSave}
+                onClick={async () => {
+                  await handleTaskSave();
+                  setTimeout(() => setTaskStatus(''), 5000);
+                }}
                 disabled={!isAuthenticated}
                 title={isAuthenticated ? 'Save task' : 'Login required'}
               >
@@ -643,18 +649,34 @@ const App = () => {
         <div className="footer-content">
           <div className="socials">
             <ol>
-              <ul>Facebook</ul>
               <ul>
-                Instagram
+                <FontAwesomeIcon icon={faFacebook} style={{ height: '1.4rem' }} />Facebook</ul>
+              <ul>
+                <FontAwesomeIcon icon={faInstagram} style={{ height: '1.4rem' }} />  Instagram
               </ul>
-              <ul>Twitter</ul>
-              <ul>LinkedIn</ul>
+              <ul>
+                <FontAwesomeIcon icon={faSquareTwitter} style={{ height: '1.4rem' }} />Twitter</ul>
+              <ul>
+                <FontAwesomeIcon icon={faSquareLinkedin} style={{ height: '1.4rem' }} />LinkedIn</ul>
             </ol>
           </div>
+
+          <div className="contact-info">
+            <ol>
+              <ul>Email:supradiproy737@gmail.com</ul>
+              <ul>Phone:9831948452</ul>
+              <ul>Address:kolkta</ul>
+              <ul>Service</ul>
+            </ol>
+          </div> 
+          <div className='conactform'>
+            
+          </div>
+
           <div className="footer-links">
-            <span>MENU</span>
-            <span>SERVICES</span>
-            <span>LEGAL</span>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+            <a href="#">Help</a>
           </div>
         </div>
       </footer >

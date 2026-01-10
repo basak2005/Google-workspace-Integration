@@ -8,12 +8,31 @@ from google.genai import types
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from datetime import datetime, timedelta
+from dateutil import parser as date_parser
 from typing import Optional, List, Dict, Any
 from config import GEMINI_API_KEY
 import base64
 
 # Configure Gemini client
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
+
+def find_overlapping_events(events: List[Dict]) -> List[str]:
+    """Find overlapping events and return warning strings"""
+    overlaps = []
+    for i, e1 in enumerate(events):
+        start1 = e1.get('start', {}).get('dateTime')
+        end1 = e1.get('end', {}).get('dateTime')
+        if not start1 or not end1: continue
+        t1_start, t1_end = date_parser.parse(start1), date_parser.parse(end1)
+        for e2 in events[i+1:]:
+            start2 = e2.get('start', {}).get('dateTime')
+            end2 = e2.get('end', {}).get('dateTime')
+            if not start2 or not end2: continue
+            t2_start, t2_end = date_parser.parse(start2), date_parser.parse(end2)
+            if t1_start < t2_end and t2_start < t1_end:
+                overlaps.append(f"'{e1.get('summary', 'Untitled')}' & '{e2.get('summary', 'Untitled')}'")
+    return overlaps
 
 
 def get_all_events(credentials: Credentials, days_ahead: int = 7) -> List[Dict[str, Any]]:
@@ -215,10 +234,16 @@ Provide output in this exact format:
 2. [Second priority]
 3. [Third priority]
 
+**🗓️ DAY PLAN**
+• Morning: [Focus work/meetings]
+• Afternoon: [Key activities]
+• Best time for deep work: [Suggested slot]
+
 Rules:
 - One line per item, no extra explanation
 - Skip sections if empty
-- Max 150 words total"""
+- Suggest time blocks around meetings
+- Max 180 words total"""
 
     # Build the prompt - kept minimal
     prompt = f"""Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
@@ -238,6 +263,11 @@ Rules:
     )
     
     ai_summary = response.text or "Unable to generate summary."
+    
+    # Add overlap warning if any
+    overlaps = find_overlapping_events(events)
+    if overlaps:
+        ai_summary += f"\n\n⚠️ **Overlapping events:** {', '.join(overlaps)}"
     
     return {
         "success": True,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Response, Cookie
+from fastapi import APIRouter, HTTPException, Response, Cookie, Header
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
@@ -23,6 +23,20 @@ SESSION_COOKIE_NAME = "session_id"
 
 # In-memory cache per session (for serverless, this resets, so we rely on MongoDB)
 credentials_cache = {}
+
+
+def extract_session_id(
+    session_cookie: Optional[str] = None,
+    authorization: Optional[str] = None
+) -> Optional[str]:
+    """Extract session ID from cookie or Authorization header"""
+    # Check Authorization header first (for cross-origin requests)
+    if authorization:
+        if authorization.startswith("Bearer "):
+            return authorization[7:]
+        return authorization
+    # Fall back to cookie
+    return session_cookie
 
 
 def get_user_email_from_credentials(credentials):
@@ -165,21 +179,10 @@ def callback(code: str, state: str, response: Response):
         # Persist to MongoDB database with session ID as key
         save_credentials(credentials, session_id)
         
-        # Create redirect response with session cookie
-        redirect_response = RedirectResponse(url=FRONTEND_URL)
-        
-        # Set session cookie (HttpOnly, Secure in production)
-        is_production = os.getenv("VERCEL_ENV") == "production"
-        redirect_response.set_cookie(
-            key=SESSION_COOKIE_NAME,
-            value=session_id,
-            httponly=True,
-            secure=is_production,  # Only HTTPS in production
-            samesite="lax",
-            max_age=30 * 24 * 60 * 60,  # 30 days
-        )
-        
-        return redirect_response
+        # Redirect to frontend with session_id in URL (token-based auth for cross-origin)
+        # Frontend should store this in localStorage and send via Authorization header
+        redirect_url = f"{FRONTEND_URL}?session_id={session_id}"
+        return RedirectResponse(url=redirect_url)
         
     except Exception as e:
         print(f"❌ OAuth callback error: {e}")
@@ -187,8 +190,12 @@ def callback(code: str, state: str, response: Response):
 
 
 @router.get("/success")
-def auth_success(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
+def auth_success(
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+    authorization: Optional[str] = Header(None)
+):
     """Success page after authentication"""
+    session_id = extract_session_id(session_cookie, authorization)
     creds = get_credentials(session_id)
     if creds:
         user_email = get_user_email_from_credentials(creds)
@@ -203,8 +210,12 @@ def auth_success(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_N
 
 
 @router.get("/status")
-def auth_status(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
+def auth_status(
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+    authorization: Optional[str] = Header(None)
+):
     """Check if user is authenticated"""
+    session_id = extract_session_id(session_cookie, authorization)
     creds = get_credentials(session_id)
     if creds:
         user_email = get_user_email_from_credentials(creds)
@@ -220,9 +231,11 @@ def auth_status(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NA
 @router.post("/logout")
 def logout(
     response: Response,
-    session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)
+    session_cookie: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME),
+    authorization: Optional[str] = Header(None)
 ):
     """Clear stored credentials for current user session"""
+    session_id = extract_session_id(session_cookie, authorization)
     if session_id:
         # Remove from memory cache
         if session_id in credentials_cache:

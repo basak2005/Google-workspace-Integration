@@ -8,7 +8,7 @@ import { faPhone, faMap, faCity, faLocationArrow, faEnvelope, faArrowPointer } f
 import { faEnvelopeOpen, faCalendar, faFileLines, faCalendarCheck, faCalendarXmark } from '@fortawesome/free-regular-svg-icons';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import api from './api';
+import api, { getSessionId, setSessionId, clearSessionId } from './api';
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -183,6 +183,8 @@ const App = () => {
       setAuthError(message);
       toast.error(message);
     } finally {
+      // Clear session from localStorage
+      clearSessionId();
       // Clear Kanban board data from localStorage
       localStorage.removeItem('kanban_board_data');
 
@@ -378,6 +380,18 @@ const App = () => {
   };
 
   useEffect(() => {
+    // Check for session_id in URL (from OAuth callback redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionIdFromUrl = urlParams.get('session_id');
+    
+    if (sessionIdFromUrl) {
+      // Store session_id in localStorage
+      setSessionId(sessionIdFromUrl);
+      // Clean URL (remove session_id from URL bar)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      toast.success('Login successful!');
+    }
+    
     checkAuthStatus();
   }, [checkAuthStatus]);
 

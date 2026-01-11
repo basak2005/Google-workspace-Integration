@@ -44,9 +44,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Parse multiple origins if needed
 allowed_origins = [
-    FRONTEND_URL,
-    "http://localhost:5173",
-    "http://localhost:3000",
+    FRONTEND_URL
 ]
 
 # CORS for frontend integration

@@ -81,6 +81,21 @@ def root():
     }
 
 
+@app.get("/debug/config", tags=["Debug"])
+def debug_config():
+    """Debug endpoint to check configuration (no sensitive data exposed)"""
+    mongodb_uri = os.getenv("MONGODB_URI", "")
+    return {
+        "mongodb_configured": bool(mongodb_uri and mongodb_uri != "mongodb://localhost:27017"),
+        "mongodb_uri_prefix": mongodb_uri[:20] + "..." if len(mongodb_uri) > 20 else "not set or localhost",
+        "frontend_url": os.getenv("FRONTEND_URL", "not set"),
+        "google_client_id_set": bool(os.getenv("GOOGLE_CLIENT_ID")),
+        "google_client_secret_set": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+        "google_redirect_uri": os.getenv("GOOGLE_REDIRECT_URI", "not set"),
+        "vercel_env": os.getenv("VERCEL_ENV", "not set"),
+    }
+
+
 # Vercel serverless handler
 handler = app
 

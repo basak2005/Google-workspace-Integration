@@ -97,31 +97,35 @@ def callback(code: str):
     """
     OAuth callback - Google redirects here with authorization code
     """
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-            }
-        },
-        scopes=SCOPES,
-    )
+    try:
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=SCOPES,
+        )
 
-    flow.redirect_uri = GOOGLE_REDIRECT_URI
-    flow.fetch_token(code=code)
+        flow.redirect_uri = GOOGLE_REDIRECT_URI
+        flow.fetch_token(code=code)
 
-    credentials = flow.credentials
-    
-    # Store in memory cache
-    credentials_store["credentials"] = credentials
-    
-    # Persist to MongoDB database
-    save_credentials(credentials)
+        credentials = flow.credentials
+        
+        # Store in memory cache
+        credentials_store["credentials"] = credentials
+        
+        # Persist to MongoDB database
+        save_credentials(credentials)
 
-    # Redirect to frontend URL (from environment)
-    return RedirectResponse(url=FRONTEND_URL)
+        # Redirect to frontend URL (from environment)
+        return RedirectResponse(url=FRONTEND_URL)
+    except Exception as e:
+        print(f"❌ OAuth callback error: {e}")
+        raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
 
 
 @router.get("/success")

@@ -1,6 +1,5 @@
 import './App.css';
 import Calendar from './Calendar.jsx';
-import KanbanBoard from './Kanbanbord.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFacebook, faInstagram, faSquareTwitter, faSquareLinkedin } from '@fortawesome/free-brands-svg-icons';
@@ -8,7 +7,7 @@ import { faPhone, faMap, faCity, faLocationArrow, faEnvelope, faArrowPointer } f
 import { faEnvelopeOpen, faCalendar, faFileLines, faCalendarCheck, faCalendarXmark } from '@fortawesome/free-regular-svg-icons';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import api, { getSessionId, setSessionId, clearSessionId } from './api';
+import api from './api';
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -23,9 +22,6 @@ const App = () => {
   const [taskHeading, setTaskHeading] = useState('');
   const [taskStatus, setTaskStatus] = useState('');
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [eventSearchQuery, setEventSearchQuery] = useState('');
-  const [eventSortOrder, setEventSortOrder] = useState('asc');
-  const [view, setView] = useState('dashboard');
 
 
   const loadTasks = useCallback(async () => {
@@ -80,8 +76,6 @@ const App = () => {
             checkbox.textContent = 'Completed';
             checkbox.disabled = true;
             toast.success('Task marked as completed.');
-            // Trigger Kanban sync
-            window.dispatchEvent(new CustomEvent('kanban-task-completed'));
           } catch (error) {
             const message = error.response?.data?.detail ?? error.message ?? 'Failed to mark task as done';
             toast.error(message);
@@ -97,8 +91,6 @@ const App = () => {
             await api.delete(`/tasks/${id}`, { withCredentials: true });
             row.remove();
             toast.success('Task deleted.');
-            // Trigger Kanban sync
-            window.dispatchEvent(new CustomEvent('kanban-task-deleted'));
           } catch (error) {
             const message = error.response?.data?.detail ?? error.message ?? 'Failed to delete task';
             toast.error(message);
@@ -183,11 +175,6 @@ const App = () => {
       setAuthError(message);
       toast.error(message);
     } finally {
-      // Clear session from localStorage
-      clearSessionId();
-      // Clear Kanban board data from localStorage
-      localStorage.removeItem('kanban_board_data');
-
       setIsAuthenticated(false);
       setUserEmail('');
       setProfilePicture('');
@@ -204,47 +191,6 @@ const App = () => {
 
   const closeProfileMenu = () => {
     setIsProfileMenuOpen(false);
-  };
-
-  const sanitizeSummaryText = (value) => {
-    const text = typeof value === 'string' ? value : String(value ?? '');
-    return text.replace(/[\*#]/g, '').replace(/\s+\n/g, '\n').trim();
-  };
-
-  const formatSummary = (value) => {
-    if (value == null) {
-      return 'No insight available.';
-    }
-    if (typeof value === 'string') {
-      return sanitizeSummaryText(value);
-    }
-    if (Array.isArray(value)) {
-      return value
-        .map((item) => {
-          const line = formatSummary(item);
-          return line.includes('\n')
-            ? `- ${line.split('\n').join('\n  ')}`
-            : `- ${line}`;
-        })
-        .join('\n');
-    }
-    if (typeof value === 'object') {
-      return Object.entries(value)
-        .map(([key, val]) => {
-          const prettyKey = key.replace(/_/g, ' ');
-          const label = prettyKey.charAt(0).toUpperCase() + prettyKey.slice(1);
-          const formatted = formatSummary(val);
-          if (formatted.includes('\n')) {
-            return `${label}:\n${formatted
-              .split('\n')
-              .map((line) => (line ? `  ${line}` : line))
-              .join('\n')}`;
-          }
-          return `${label}: ${formatted}`;
-        })
-        .join('\n');
-    }
-    return sanitizeSummaryText(value);
   };
 
   useEffect(() => {
@@ -279,7 +225,7 @@ const App = () => {
       const events = res.data?.events ?? res.data ?? [];
       const now = new Date();
       const end = new Date(now);
-      end.setDate(end.getDate() + 31);
+      end.setDate(end.getDate() + 7);
 
       const filtered = events
         .map((event) => {
@@ -293,24 +239,25 @@ const App = () => {
           const labelDate = date.toLocaleDateString();
           const labelTime = isAllDay ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const title = event?.summary ?? event?.title ?? '(no title)';
-          const dateValue = date.getTime();
 
           return {
             id: event?.id ?? event?.eventId ?? `${title}-${date.toISOString()}`,
             label: `${labelDate}${labelTime ? ` ${labelTime}` : ''} - ${title}`,
-            dateValue,
+            date,
           };
         })
         .filter(Boolean)
-        .filter(({ dateValue }) => dateValue >= now.getTime() && dateValue <= end.getTime())
-        .sort((a, b) => a.dateValue - b.dateValue);
-
-      setUpcomingEvents(filtered);
-      setEventsError('');
+        .filter(({ date }) => date >= now && date <= end)
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map(({ id, label }) => ({ id, label }));
 
       if (filtered.length === 0) {
-        toast.info('No events in the next month.');
+        setUpcomingEvents([]);
+        setEventsError('No events in the next 7 days');
+        toast.info('No events in the next 7 days.');
       } else {
+        setUpcomingEvents(filtered);
+        setEventsError('');
         toast.success(`Loaded ${filtered.length} upcoming event${filtered.length === 1 ? '' : 's'}.`);
       }
     } catch (error) {
@@ -370,8 +317,6 @@ const App = () => {
       setTaskHeading('');
       toast.success('Task saved successfully.');
       await loadTasks();
-      // Trigger Kanban sync
-      window.dispatchEvent(new CustomEvent('kanban-task-added'));
     } else {
       const msg = lastError?.response?.data?.detail ?? lastError?.message ?? 'Failed to save task';
       setTaskStatus(msg);
@@ -380,6 +325,10 @@ const App = () => {
   };
 
   useEffect(() => {
+<<<<<<< HEAD
+    checkAuthStatus();
+  }, [checkAuthStatus]);
+=======
     // Check for session_id in URL (from OAuth callback redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const sessionIdFromUrl = urlParams.get('session_id');
@@ -398,6 +347,7 @@ const App = () => {
       checkAuthStatus();
     }
   }, []); // Remove checkAuthStatus dependency to prevent re-runs
+>>>>>>> 8c4423ca7c4bb8a5e1e4df8ea8f5a104aed54731
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -410,41 +360,8 @@ const App = () => {
       setTaskStatus('');
       loadTasks();
       setIsProfileMenuOpen(false);
-      setEventSearchQuery('');
-      setEventSortOrder('asc');
     }
   }, [isAuthenticated, refreshUpcomingEvents, loadTasks]);
-
-  const normalizedEventQuery = eventSearchQuery.trim().toLowerCase();
-  const visibleEvents = upcomingEvents
-    .filter(({ label }) => label.toLowerCase().includes(normalizedEventQuery))
-    .slice()
-    .sort((a, b) => (eventSortOrder === 'asc' ? a.dateValue - b.dateValue : b.dateValue - a.dateValue));
-  const hasEvents = upcomingEvents.length > 0;
-  const hasVisibleEvents = visibleEvents.length > 0;
-
-  const toggleEventSortOrder = () => {
-    setEventSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-  };
-
-  const deleteEvent = async (eventId) => {
-    if (!isAuthenticated) {
-      toast.error('Please login first.');
-      return;
-    }
-    try {
-      await api.delete(`/calendar/events/${eventId}`, { withCredentials: true });
-      toast.success('Event deleted successfully.');
-      // Refresh the events list
-      refreshUpcomingEvents();
-      // Trigger Kanban sync
-      window.dispatchEvent(new CustomEvent('kanban-event-deleted'));
-    } catch (error) {
-      console.error('Failed to delete event:', error);
-      const message = error.response?.data?.detail ?? error.message ?? 'Failed to delete event';
-      toast.error(message);
-    }
-  };
 
   const userInitial = (userName || userEmail || '?').charAt(0).toUpperCase();
 
@@ -454,8 +371,7 @@ const App = () => {
       {/* Navigation */}
       <nav className="navbar">
         <div className="nav-links">
-          <a href="#" onClick={(e) => { e.preventDefault(); setView('dashboard'); }}>Home</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); setView('kanban'); }}>Kanban Board</a>
+          <a href="#">Home</a>
           <a href="#">About Us</a>
           <a href="#">Contact Us</a>
         </div>
@@ -530,368 +446,265 @@ const App = () => {
 
       {/* Content Grid */}
       <main className="grid-layout">
-        {view === 'dashboard' ? (
-          <>
-            <section className="card-section">
-              <h2>Create Event</h2>
-              <form
-                className="card create-event-card"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.currentTarget;
-                  if (!isAuthenticated) {
-                    toast.error('Please login with Google first.');
-                    return;
+        <section className="card-section">
+          <h2>Create Event</h2>
+          <form
+            className="card create-event-card"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!isAuthenticated) {
+                toast.error('Please login with Google first.');
+                return;
+              }
+              const fd = new FormData(e.currentTarget);
+              const summary = (fd.get('summary') || '').toString().trim();
+              const description = (fd.get('description') || '').toString().trim();
+              const location = (fd.get('location') || '').toString().trim();
+              const attendeesRaw = (fd.get('attendees') || '').toString();
+              const startDate = (fd.get('startDate') || '').toString();
+              const endDateInput = (fd.get('endDate') || '').toString();
+              const startTimeInput = (fd.get('startTime') || '').toString();
+              const endTimeInput = (fd.get('endTime') || '').toString();
+
+              const normalizeTime = (value) => {
+                const trimmed = (value || '').toString().trim();
+                if (!trimmed) {
+                  return '00:00:00';
+                }
+                return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+              };
+
+              if (!summary || !startDate) {
+                toast.warn('Please enter event summary and start date.');
+                return;
+              }
+
+              const startTime = normalizeTime(startTimeInput);
+              const startDateTime = `${startDate}T${startTime}`;
+
+              let endDate = endDateInput || startDate;
+              let endTime = normalizeTime(endTimeInput || startTimeInput);
+
+              const startInstant = new Date(`${startDate}T${startTime}`);
+              let endInstant = new Date(`${endDate}T${endTime}`);
+
+              if (Number.isNaN(startInstant.getTime())) {
+                toast.warn('Please enter a valid start date and time.');
+                return;
+              }
+
+              if (Number.isNaN(endInstant.getTime()) || endInstant < startInstant) {
+                endDate = startDate;
+                endTime = startTime;
+                endInstant = new Date(`${endDate}T${endTime}`);
+              }
+
+              const endDateTime = `${endDate}T${endTime}`;
+
+              const attendees = attendeesRaw
+                .split(/[,;\s]+/)
+                .map((e) => e.trim())
+                .filter(Boolean);
+
+              const eventPayload = {
+                summary,
+                start_datetime: startDateTime,
+                end_datetime: endDateTime,
+                description,
+                location,
+                attendees,
+                timezone: 'IST',
+              };
+
+              const endpointsToTry = [
+                '/calendar/events',
+              ];
+
+              let created = false;
+              let lastError = null;
+
+              for (const url of endpointsToTry) {
+                try {
+                  const res = await api.post(url, eventPayload, { withCredentials: true });
+                  if (res && (res.status >= 200 && res.status < 300)) {
+                    created = true;
+                    break;
                   }
-                  const fd = new FormData(form);
-                  const summary = (fd.get('summary') || '').toString().trim();
-                  const description = (fd.get('description') || '').toString().trim();
-                  const location = (fd.get('location') || '').toString().trim();
-                  const attendeesRaw = (fd.get('attendees') || '').toString();
-                  const startDate = (fd.get('startDate') || '').toString();
-                  const endDateInput = (fd.get('endDate') || '').toString();
-                  const startTimeInput = (fd.get('startTime') || '').toString();
-                  const endTimeInput = (fd.get('endTime') || '').toString();
+                } catch (err) {
+                  lastError = err;
+                }
+              }
 
-                  const normalizeTime = (value) => {
-                    const trimmed = (value || '').toString().trim();
-                    if (!trimmed) {
-                      return '00:00:00';
-                    }
-                    return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
-                  };
+              if (created) {
+                toast.success('Event created successfully.');
+                e.currentTarget.reset();
+                await refreshUpcomingEvents();
+              } else {
+                const msg =
+                  lastError?.response?.data?.detail ||
+                  lastError?.message ||
+                  'Failed to create event';
+                toast.error(msg);
 
-                  if (!summary || !startDate) {
-                    toast.warn('Please enter event summary and start date.');
-                    return;
-                  }
+              }
+            }}
+          >
+            <div className="input-row">
+              <FontAwesomeIcon icon={faCalendar} />
+              <input name="summary" type="text" placeholder="Event Summary" />
+            </div>
+            <div className="input-row">
+              <FontAwesomeIcon icon={faCalendarCheck} /><span>StartEvent:</span>
+              <input className="startDate" name="startDate" type="date" style={{ width: '25%' }} />
+              <span>StartTime:</span>
+              <input className="startTime" name="startTime" type="time" />
+            </div>
+            <div className="input-row">
+              <FontAwesomeIcon icon={faCalendarCheck} /><span>End Event:</span>
+              <input className="endDate" name="endDate" type="date" style={{ width: '25%' }} />
+              <span>End Time:</span>
+              <input className="endTime" name="endTime" type="time" />
+            </div>
+            <div className="input-row">
+              <FontAwesomeIcon icon={faFileLines} /><input name="description" type="text" placeholder="Description" />
+            </div>
+            <div className="input-row">
+              <FontAwesomeIcon icon={faEnvelopeOpen} /><input
+                name="attendees"
+                type="text"
+                placeholder="Attendee emails"
+                title="You can add multiple emails separated by commas"
+              />
+            </div>
+            <div className="input-row">
+              <FontAwesomeIcon icon={faLocationArrow} /><input name="location" type="text" placeholder="Location" />
+            </div>
+            <button className="save-btn" type="submit" disabled={!isAuthenticated} title={isAuthenticated ? 'Create event' : 'Login required'}>
+              Save
+            </button>
+          </form>
 
-                  const startTime = normalizeTime(startTimeInput);
-                  const startDateTime = `${startDate}T${startTime}`;
+          <section className="clock-section">
+            <h2>Clock</h2>
+            <div className="card clock-card">
+              <iframe
+                src="https://free.timeanddate.com/clock/ia7w4kyf/n54/tlin/fn7/fs20/fce9b36b/tct/pct/ftb/th2/ta1"
+                width="176"
+                height="90"
+                allowTransparency="true"
+              ></iframe>
+            </div>
+          </section>
+        </section>
 
-                  let endDate = endDateInput || startDate;
-                  let endTime = normalizeTime(endTimeInput || startTimeInput);
+        <section className="card-section">
+          <h2>Calendar</h2>
+          <div className="card calendar-card">
+            <Calendar />
+          </div>
+        </section>
 
-                  const startInstant = new Date(`${startDate}T${startTime}`);
-                  let endInstant = new Date(`${endDate}T${endTime}`);
-
-                  if (Number.isNaN(startInstant.getTime())) {
-                    toast.warn('Please enter a valid start date and time.');
-                    return;
-                  }
-
-                  if (Number.isNaN(endInstant.getTime()) || endInstant < startInstant) {
-                    endDate = startDate;
-                    endTime = startTime;
-                    endInstant = new Date(`${endDate}T${endTime}`);
-                  }
-
-                  const endDateTime = `${endDate}T${endTime}`;
-
-                  const attendees = attendeesRaw
-                    .split(/[,;\s]+/)
-                    .map((e) => e.trim())
-                    .filter(Boolean);
-
-                  const eventPayload = {
-                    summary,
-                    start_datetime: startDateTime,
-                    end_datetime: endDateTime,
-                    description,
-                    location,
-                    attendees,
-                    timezone: 'IST',
-                  };
-
-                  const endpointsToTry = [
-                    '/calendar/events',
-                  ];
-
-                  let created = false;
-                  let lastError = null;
-
-                  for (const url of endpointsToTry) {
-                    try {
-                      const res = await api.post(url, eventPayload, { withCredentials: true });
-                      if (res && (res.status >= 200 && res.status < 300)) {
-                        created = true;
-                        break;
-                      }
-                    } catch (err) {
-                      lastError = err;
-                    }
-                  }
-
-                  if (created) {
-                    toast.success('Event created successfully.');
-                    form.reset();
-                    setEventSearchQuery('');
-                    setEventSortOrder('asc');
-                    // Auto-refresh upcoming events list
-                    refreshUpcomingEvents();
-                    // Trigger Kanban sync
-                    window.dispatchEvent(new CustomEvent('kanban-event-added'));
-                  } else {
-                    const msg =
-                      lastError?.response?.data?.detail ||
-                      lastError?.message ||
-                      'Failed to create event';
-                    toast.error(msg);
-
-                  }
-                }}
-              >
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faCalendar} />
-                  <input name="summary" type="text" placeholder="Event Summary" />
-                </div>
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faCalendarCheck} /><span>StartEvent:</span>
-                  <input className="startDate" name="startDate" type="date" style={{ width: '25%' }} />
-                  <span>StartTime:</span>
-                  <input className="startTime" name="startTime" type="time" />
-                </div>
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faCalendarCheck} /><span>End Event:</span>
-                  <input className="endDate" name="endDate" type="date" style={{ width: '25%' }} />
-                  <span>End Time:</span>
-                  <input className="endTime" name="endTime" type="time" />
-                </div>
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faFileLines} /><input name="description" type="text" placeholder="Description" />
-                </div>
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faEnvelopeOpen} /><input
-                    name="attendees"
-                    type="text"
-                    placeholder="Attendee emails"
-                    title="You can add multiple emails separated by commas"
-                  />
-                </div>
-                <div className="input-row">
-                  <FontAwesomeIcon icon={faLocationArrow} /><input name="location" type="text" placeholder="Location" />
-                </div>
-                <button className="save-btn" type="submit" disabled={!isAuthenticated} title={isAuthenticated ? 'Create event' : 'Login required'}>
-                  Save
+        <div className="card-section full-width">
+          <h2>Upcoming Events</h2>
+          <div className="eventmanegament">
+            <div className="card upcoming-card">
+              <div className="placeholder-content" style={{ marginBottom: '-2rem' }}>
+                {!isAuthenticated && <span>Login to see events</span>}
+                {isAuthenticated && (
+      
+                  <>
+                    {isLoadingEvents && <span>Loading...</span>}
+                    {!isLoadingEvents && eventsError && <span className="auth-error">{eventsError}</span>}
+                    {!isLoadingEvents && !eventsError && upcomingEvents.length === 0 && (
+                      <span>No events in the next 7 days</span>
+                    )}
+                    {!isLoadingEvents && !eventsError && upcomingEvents.length > 0 && (
+                      <div className="upcoming-events-list">
+                        {upcomingEvents.map(({ id, label }) => (
+                          <div key={id} className="input-row">{label}</div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="buttionname" style={{ marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="save-btn"
+                  onClick={refreshUpcomingEvents}
+                  disabled={!isAuthenticated || isLoadingEvents}
+                  title={isAuthenticated ? 'Refresh events' : 'Login required'}
+                >
+                  Refresh
                 </button>
-              </form>
-
-              <section className="clock-section">
-                <h2>Clock</h2>
-                <div className="card clock-card">
-                  <iframe
-                    src="https://free.timeanddate.com/clock/ia7w4kyf/n54/tlin/fn7/fs20/fce9b36b/tct/pct/ftb/th2/ta1"
-                    width="176"
-                    height="90"
-                    allowTransparency="true"
-                  ></iframe>
+              </div>
+            </div>
+            <div className='taskshow'>
+              <section className='TaskShow'>
+                <h2>Upcoming Task</h2>
+                <div className="card taskshow-card">
+                  <div id="tasks-container" className="upcoming-events-list" style={{ marginBottom: '8px' }}></div>
                 </div>
               </section>
-            </section>
-
-            <section className="card-section">
-              <h2>Calendar</h2>
-              <div className="card calendar-card">
-                <Calendar />
-              </div>
-            </section>
-
-            <div className="card-section full-width">
-              <h2>Upcoming Events</h2>
-              <div className="eventmanegament">
-                <div className="card upcoming-card">
-                  <div className="placeholder-content" style={{ marginBottom: '-2rem' }}>
-                    {!isAuthenticated && <span>Login to see events</span>}
-                    {isAuthenticated && (
-
-                      <>
-                        {isLoadingEvents && <span>Loading...</span>}
-                        {!isLoadingEvents && eventsError && <span className="auth-error">{eventsError}</span>}
-                        {!isLoadingEvents && !eventsError && (
-                          <>
-                            <div className="upcoming-controls">
-                              <input
-                                type="search"
-                                value={eventSearchQuery}
-                                onChange={(e) => setEventSearchQuery(e.target.value)}
-                                placeholder="Search events"
-                                className="upcoming-search"
-                              />
-                              <button
-                                type="button"
-                                className="save-btn upcoming-sort-toggle"
-                                onClick={toggleEventSortOrder}
-                              >
-                                Sort: {eventSortOrder === 'asc' ? 'Asc' : 'Desc'}
-                              </button>
-                            </div>
-                            {!hasEvents ? (
-                              <span>No events in the next month</span>
-                            ) : !hasVisibleEvents ? (
-                              <span>No events match your search.</span>
-                            ) : (
-                              <div className="upcoming-events-list">
-                                {visibleEvents.map(({ id, label }) => (
-                                  <div key={id} className="input-row">
-                                    <span>{label}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteEvent(id)}
-                                      title="Delete event"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className='taskshow'>
-                  <section className='TaskShow'>
-                    <h2>Upcoming Task</h2>
-                    <div className="card taskshow-card">
-                      <div id="tasks-container" className="upcoming-events-list" style={{ marginBottom: '8px' }}></div>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </div >
-            <section className="card-section full-width">
-              <h2>Your Tasks</h2>
-              <div className="card notes-card">
-                <div className='input-row'>
-                  <input type="text"
-                    placeholder="Enter Task Headline"
-                    value={taskHeading}
-                    onChange={(e) => setTaskHeading(e.target.value)}
-                  />
-                </div>
-                <textarea
-                  id="task-text"
-                  placeholder="Write your event Tasks here..."
-                  value={taskText}
-                  onChange={(e) => setTaskText(e.target.value)}
-                ></textarea>
-                {taskStatus && (
-                  <div
-                    style={{
-                      marginTop: '8px',
-                      color:
-                        taskStatus === 'Task saved successfully.'
-                          ? '#1b5e20'
-                          : taskStatus === 'Saving task...'
-                            ? '#1976d2'
-                            : '#d32f2f',
-                    }}
-                  >
-                    {taskStatus}
-                  </div>
-                )}
-                <div className="input" style={{ marginTop: '8px' }}>
-                  <button
-                    type="button"
-                    className="save-btn"
-                    onClick={async () => {
-                      await handleTaskSave();
-                      setTimeout(() => setTaskStatus(''), 5000);
-                    }}
-                    disabled={!isAuthenticated}
-                    title={isAuthenticated ? 'Save task' : 'Login required'}
-                  >
-                    Save Task
-                  </button>
-                </div>
-              </div>
-            </section>
-            <section className='kanbanbord full-width'>
-              <h2>Kanban Board</h2>
-              <div className="card kanban-card ">
-                <KanbanBoard isAuthenticated={isAuthenticated} />
-              </div>
-            </section>
-            <section className="card-section full-width">
-              <h2>Your Task Assistance</h2>
-              <div className="card ai-response-card">
-                <div
-                  id="ai-summary-output"
-                  className="placeholder-content"
-                  style={{
-                    whiteSpace: 'pre-wrap',
-                    textAlign: 'left',
-                    lineHeight: '1.6',
-                    minHeight: '60px',
-                    color: '#333',
-                    fontSize: '0.95rem',
-                    backgroundColor: '#f7f9ff',
-                    border: '1px solid #dce3f5',
-                    borderRadius: '10px',
-                    padding: '16px',
-                    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
-                    fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
-                    transition: 'box-shadow 0.2s ease-in-out'
-                  }}
-                >
-                  <span>{isAuthenticated ? 'Ready to analyze your schedule.' : 'Login to access AI assistance.'}</span>
-                </div>
-                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    className="save-btn"
-                    disabled={!isAuthenticated}
-                    onClick={async (e) => {
-                      if (!isAuthenticated) return;
-                      const button = e.currentTarget;
-                      const output = document.getElementById('ai-summary-output');
-                      if (!output) return;
-
-                      const originalText = button.textContent;
-                      button.textContent = 'Analyzing...';
-                      button.disabled = true;
-                      output.innerHTML = '<i>Contacting AI services...</i>';
-
-                      try {
-                        const res = await api.get('/smart-summary', { withCredentials: true });
-                        const summary = res.data?.summary ?? res.data?.response ?? res.data ?? 'No insight available.';
-
-                        let formatted = summary;
-                        if (typeof formatted === 'string') {
-                          try {
-                            const parsed = JSON.parse(formatted);
-                            formatted = parsed;
-                          } catch (parseError) {
-                            // Leave formatted as string when JSON parsing fails.
-                          }
-                        }
-
-                        output.textContent = formatSummary(formatted);
-                        toast.success('AI Insight generated.');
-                      } catch (error) {
-                        console.error('AI Summary error:', error);
-                        const msg = error.response?.data?.detail ?? 'Failed to fetch AI summary.';
-                        output.textContent = msg;
-                        toast.error(msg);
-                      } finally {
-                        button.textContent = originalText;
-                        button.disabled = false;
-                      }
-                    }}
-                  >
-                    Get AI Insights
-                  </button>
-                </div>
-              </div>
-            </section>
-          </>
-        ) : (
-          <div className="full-width">
-            <KanbanBoard isAuthenticated={isAuthenticated} />
+            </div>
           </div>
-        )}
+        </div >
+        <section className="card-section full-width">
+          <h2>Your Tasks</h2>
+          <div className="card notes-card">
+            <div className='input-row'>
+              <input type="text"
+                placeholder="Enter Task Headline"
+                value={taskHeading}
+                onChange={(e) => setTaskHeading(e.target.value)}
+              />
+            </div>
+            <textarea
+              id="task-text"
+              placeholder="Write your event Tasks here..."
+              value={taskText}
+              onChange={(e) => setTaskText(e.target.value)}
+            ></textarea>
+            {taskStatus && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  color:
+                    taskStatus === 'Task saved successfully.'
+                      ? '#1b5e20'
+                      : taskStatus === 'Saving task...'
+                        ? '#1976d2'
+                        : '#d32f2f',
+                }}
+              >
+                {taskStatus}
+              </div>
+            )}
+            <div className="input" style={{ marginTop: '8px' }}>
+              <button
+                type="button"
+                className="save-btn"
+                onClick={async () => {
+                  await handleTaskSave();
+                  setTimeout(() => setTaskStatus(''), 5000);
+                }}
+                disabled={!isAuthenticated}
+                title={isAuthenticated ? 'Save task' : 'Login required'}
+              >
+                Save Task
+              </button>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2>Your Task Assistence</h2>
+          <div className="card ai-response-card">
+            <div className="placeholder-content">
+              <span>AI Task Assistence Coming Soon...</span>
+            </div>
+          </div>
+        </section>
       </main >
       {/* Footer */}
       <footer footer className="footer" >
@@ -899,9 +712,7 @@ const App = () => {
           <div className="socials">
             <ol>
               <ul>
-                <FontAwesomeIcon icon={faFacebook} style={{ height: '1.4rem' }} /><a href='https://www.facebook.com/supradip888'>Facebook
-
-                </a></ul>
+                <FontAwesomeIcon icon={faFacebook} style={{ height: '1.4rem' }} />Facebook<a href='https://www.facebook.com/supradip888'></a></ul>
               <ul>
                 <FontAwesomeIcon icon={faInstagram} style={{ height: '1.4rem' }} />  Instagram
               </ul>

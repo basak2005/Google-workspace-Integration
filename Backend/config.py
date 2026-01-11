@@ -1,7 +1,10 @@
 import os
 from dotenv import load_dotenv
 
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+# Allow OAuth over HTTP for local development only
+if os.getenv("VERCEL_ENV") is None:
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
 load_dotenv()
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -9,7 +12,11 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-GOOGLE_REDIRECT_URI = "http://localhost:8000/auth/callback"
+# Dynamic redirect URI based on environment
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+GOOGLE_REDIRECT_URI = f"{BACKEND_URL}/auth/callback"
 
 # Google API Scopes - All products
 SCOPES = [

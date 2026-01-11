@@ -1,123 +1,158 @@
 """
 Database module for storing OAuth credentials
-Uses SQLite for persistence across server restarts
+Uses MongoDB Atlas for persistence (serverless-friendly)
 """
-import sqlite3
-import json
 import os
+import json
 from datetime import datetime
 from typing import Any
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "tokens.db")
+# MongoDB Atlas connection
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "google_services")
+
+# Global client (connection pooling)
+_client = None
+_db = None
+
+
+def get_database():
+    """Get MongoDB database connection with connection pooling"""
+    global _client, _db
+    
+    if _db is not None:
+        return _db
+    
+    try:
+        _client = MongoClient(
+            MONGODB_URI,
+            serverSelectionTimeoutMS=5000,
+            maxPoolSize=10,
+            minPoolSize=1
+        )
+        # Test connection
+        _client.admin.command('ping')
+        _db = _client[DATABASE_NAME]
+        print("✅ Connected to MongoDB Atlas")
+        return _db
+    except ConnectionFailure as e:
+        print(f"❌ MongoDB connection failed: {e}")
+        raise
 
 
 def init_db():
-    """Initialize the SQLite database"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS oauth_tokens (
-            id INTEGER PRIMARY KEY,
-            user_email TEXT UNIQUE,
-            token TEXT NOT NULL,
-            refresh_token TEXT,
-            token_uri TEXT,
-            client_id TEXT,
-            client_secret TEXT,
-            scopes TEXT,
-            expiry TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    conn.commit()
-    conn.close()
+    """Initialize the MongoDB database and collections"""
+    try:
+        db = get_database()
+        # Create collection if not exists
+        if "oauth_tokens" not in db.list_collection_names():
+            db.create_collection("oauth_tokens")
+        
+        # Create index on user_email for faster lookups
+        db.oauth_tokens.create_index("user_email", unique=True)
+        print("✅ MongoDB initialized successfully")
+    except Exception as e:
+        print(f"⚠️ MongoDB init warning: {e}")
 
 
 def save_credentials(credentials: Any, user_email: str = "default"):
-    """Save OAuth credentials to database"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    scopes_json = json.dumps(list(credentials.scopes)) if credentials.scopes else "[]"
-    expiry_str = credentials.expiry.isoformat() if credentials.expiry else None
-    
-    cursor.execute("""
-        INSERT OR REPLACE INTO oauth_tokens 
-        (user_email, token, refresh_token, token_uri, client_id, client_secret, scopes, expiry, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        user_email,
-        credentials.token,
-        credentials.refresh_token,
-        credentials.token_uri,
-        credentials.client_id,
-        credentials.client_secret,
-        scopes_json,
-        expiry_str,
-        datetime.now().isoformat()
-    ))
-    
-    conn.commit()
-    conn.close()
+    """Save OAuth credentials to MongoDB"""
+    try:
+        db = get_database()
+        
+        scopes_list = list(credentials.scopes) if credentials.scopes else []
+        expiry_str = credentials.expiry.isoformat() if credentials.expiry else None
+        
+        document = {
+            "user_email": user_email,
+            "token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_uri": credentials.token_uri,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "scopes": scopes_list,
+            "expiry": expiry_str,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Upsert - insert or update if exists
+        db.oauth_tokens.update_one(
+            {"user_email": user_email},
+            {"$set": document, "$setOnInsert": {"created_at": datetime.now().isoformat()}},
+            upsert=True
+        )
+        print(f"✅ Credentials saved for {user_email}")
+    except Exception as e:
+        print(f"❌ Error saving credentials: {e}")
+        raise
 
 
 def load_credentials(user_email: str = "default") -> Any:
-    """Load OAuth credentials from database"""
+    """Load OAuth credentials from MongoDB"""
     from google.oauth2.credentials import Credentials
     
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT token, refresh_token, token_uri, client_id, client_secret, scopes, expiry
-        FROM oauth_tokens WHERE user_email = ?
-    """, (user_email,))
-    
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
+    try:
+        db = get_database()
+        
+        document = db.oauth_tokens.find_one({"user_email": user_email})
+        
+        if not document:
+            return None
+        
+        expiry = datetime.fromisoformat(document["expiry"]) if document.get("expiry") else None
+        
+        credentials = Credentials(
+            token=document["token"],
+            refresh_token=document.get("refresh_token"),
+            token_uri=document.get("token_uri"),
+            client_id=document.get("client_id"),
+            client_secret=document.get("client_secret"),
+            scopes=document.get("scopes"),
+        )
+        credentials.expiry = expiry
+        
+        return credentials
+    except Exception as e:
+        print(f"❌ Error loading credentials: {e}")
         return None
-    
-    token, refresh_token, token_uri, client_id, client_secret, scopes_json, expiry_str = row
-    
-    scopes = json.loads(scopes_json) if scopes_json else None
-    expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
-    
-    credentials = Credentials(
-        token=token,
-        refresh_token=refresh_token,
-        token_uri=token_uri,
-        client_id=client_id,
-        client_secret=client_secret,
-        scopes=scopes,
-    )
-    credentials.expiry = expiry
-    
-    return credentials
 
 
 def delete_credentials(user_email: str = "default"):
-    """Delete OAuth credentials from database"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM oauth_tokens WHERE user_email = ?", (user_email,))
-    conn.commit()
-    conn.close()
+    """Delete OAuth credentials from MongoDB"""
+    try:
+        db = get_database()
+        db.oauth_tokens.delete_one({"user_email": user_email})
+        print(f"✅ Credentials deleted for {user_email}")
+    except Exception as e:
+        print(f"❌ Error deleting credentials: {e}")
+        raise
 
 
 def get_all_users():
     """Get all users with stored credentials"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_email, created_at, updated_at FROM oauth_tokens")
-    rows = cursor.fetchall()
-    conn.close()
-    return [{"email": r[0], "created_at": r[1], "updated_at": r[2]} for r in rows]
+    try:
+        db = get_database()
+        cursor = db.oauth_tokens.find(
+            {},
+            {"user_email": 1, "created_at": 1, "updated_at": 1}
+        )
+        return [
+            {
+                "email": doc.get("user_email"),
+                "created_at": doc.get("created_at"),
+                "updated_at": doc.get("updated_at")
+            }
+            for doc in cursor
+        ]
+    except Exception as e:
+        print(f"❌ Error getting users: {e}")
+        return []
 
 
-# Initialize database on module import
-init_db()
+# Initialize database on module import (lazy initialization for serverless)
+try:
+    init_db()
+except Exception as e:
+    print(f"⚠️ Database initialization deferred: {e}")

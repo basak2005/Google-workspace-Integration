@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+import os
 from auth.router import router as auth_router, get_credentials
 from google_services.calendar.router import router as calendar_router
 from google_services.tasks.router import router as tasks_router
@@ -38,10 +39,20 @@ app = FastAPI(
     version="2.2.0"
 )
 
+# Get allowed origins from environment
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Parse multiple origins if needed
+allowed_origins = [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+
 # CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,8 +76,13 @@ def root():
     return {
         "message": "🧠 Google Services API with Smart Assistant",
         "docs": "/docs",
-        "smart_assistant": "GET /smart-summary - AI-powered task analysis & prioritization"
+        "smart_assistant": "GET /smart-summary - AI-powered task analysis & prioritization",
+        "environment": os.getenv("VERCEL_ENV", "development")
     }
+
+
+# Vercel serverless handler
+handler = app
 
 
 @app.get("/smart-summary", tags=["🧠 Smart Assistant"])

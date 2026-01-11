@@ -8,6 +8,7 @@ from config import (
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
     SCOPES,
+    FRONTEND_URL,
 )
 from database import save_credentials, load_credentials, delete_credentials, get_all_users
 
@@ -15,6 +16,7 @@ from database import save_credentials, load_credentials, delete_credentials, get
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 # In-memory cache (loaded from DB on startup)
+# Note: In serverless, this resets per invocation, so we rely on MongoDB
 credentials_store = {}
 
 def get_credentials():
@@ -115,10 +117,11 @@ def callback(code: str):
     # Store in memory cache
     credentials_store["credentials"] = credentials
     
-    # Persist to SQLite database
+    # Persist to MongoDB database
     save_credentials(credentials)
 
-    return RedirectResponse(url="http://localhost:5173")
+    # Redirect to frontend URL (from environment)
+    return RedirectResponse(url=FRONTEND_URL)
 
 
 @router.get("/success")

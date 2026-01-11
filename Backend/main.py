@@ -135,7 +135,3 @@ def get_current_user():
 def geocode(address: str):
     """Geocode an address using Google Maps API"""
     return geocode_address(address)
-
-
-# Vercel requires this exact export name for ASGI apps
-app = app

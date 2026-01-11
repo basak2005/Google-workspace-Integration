@@ -35,8 +35,8 @@ def find_overlapping_events(events: List[Dict]) -> List[str]:
     return overlaps
 
 
-def get_all_events(credentials: Credentials, days_ahead: int = 7) -> List[Dict[str, Any]]:
-    """Fetch all calendar events for the next N days"""
+def get_all_events(credentials: Credentials, days_ahead: int = 15) -> List[Dict[str, Any]]:
+    """Fetch all calendar events for the next N days (default 15)"""
     service = build("calendar", "v3", credentials=credentials)
     
     now = datetime.utcnow()

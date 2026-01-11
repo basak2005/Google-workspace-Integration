@@ -294,6 +294,42 @@
   font-weight: bolder;
   color: gray;
 }
+.upcoming-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.upcoming-search {
+  flex: 1 1 220px;
+  padding: 6px 10px;
+  border: 1px solid #000;
+  border-radius: 12px;
+  background: transparent;
+  color: #2d2d2d;
+}
+.upcoming-search::placeholder {
+  color: rgba(45, 45, 45, 0.6);
+}
+.upcoming-sort-toggle {
+  background: #ffffff;
+  color: #2d2d2d;
+  border: 1px solid #000;
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.upcoming-sort-toggle:hover,
+.upcoming-sort-toggle:focus {
+  background: #f0f0f0;
+  color: #1a1a1a;
+}
+.upcoming-controls .save-btn {
+  margin: 0;
+  width: auto;
+}
 .upcoming-events-list button {
   width: max-content;
   border-radius: 20px;

@@ -325,29 +325,8 @@ const App = () => {
   };
 
   useEffect(() => {
-<<<<<<< HEAD
     checkAuthStatus();
   }, [checkAuthStatus]);
-=======
-    // Check for session_id in URL (from OAuth callback redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionIdFromUrl = urlParams.get('session_id');
-    
-    if (sessionIdFromUrl) {
-      // Store session_id in localStorage
-      setSessionId(sessionIdFromUrl);
-      // Clean URL (remove session_id from URL bar)
-      window.history.replaceState({}, document.title, window.location.pathname);
-      toast.success('Login successful!');
-      // Small delay to ensure localStorage is set before checking auth
-      setTimeout(() => {
-        checkAuthStatus();
-      }, 100);
-    } else {
-      checkAuthStatus();
-    }
-  }, []); // Remove checkAuthStatus dependency to prevent re-runs
->>>>>>> 8c4423ca7c4bb8a5e1e4df8ea8f5a104aed54731
 
   useEffect(() => {
     if (isAuthenticated) {

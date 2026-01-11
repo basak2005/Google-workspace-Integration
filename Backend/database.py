@@ -1,6 +1,7 @@
 """
 Database module for storing OAuth credentials
 Uses MongoDB Atlas for persistence (serverless-friendly)
+Version: 2.0 - Vercel serverless compatible
 """
 import os
 import json

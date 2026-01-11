@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Cookie
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import os
 from auth.router import router as auth_router, get_credentials
+from auth.dependencies import require_session
 from google_services.calendar.router import router as calendar_router
 from google_services.tasks.router import router as tasks_router
 from google_services.gmail.router import router as gmail_router
@@ -103,7 +104,8 @@ def smart_summary(
     context: Optional[str] = Query(
         None, 
         description="Optional context like 'Focus on work tasks' or 'I have a deadline tomorrow'"
-    )
+    ),
+    session_id: str = Depends(require_session)
 ):
     """
     🧠 **Get AI-Powered Smart Summary**
@@ -118,7 +120,7 @@ def smart_summary(
     **Optional**: Add `context` parameter to personalize.
     Example: `/smart-summary?context=I need to focus on the client project`
     """
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     
     if not credentials:
         raise HTTPException(
@@ -136,9 +138,9 @@ def smart_summary(
 
 
 @app.get("/user/me", tags=["User"])
-def get_current_user():
+def get_current_user(session_id: str = Depends(require_session)):
     """Get current authenticated user's profile"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated")
     return get_user_info(credentials)

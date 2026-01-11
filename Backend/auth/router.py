@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response, Cookie
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 import os
+import secrets
+from typing import Optional
 from config import (
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
@@ -15,56 +18,92 @@ from database import save_credentials, load_credentials, delete_credentials, get
 # Allow scope changes (Google adds 'openid' automatically)
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
-# In-memory cache (loaded from DB on startup)
-# Note: In serverless, this resets per invocation, so we rely on MongoDB
-credentials_store = {}
+# Session cookie name
+SESSION_COOKIE_NAME = "session_id"
 
-def get_credentials():
-    """Get credentials from cache or database"""
+# In-memory cache per session (for serverless, this resets, so we rely on MongoDB)
+credentials_cache = {}
+
+
+def get_user_email_from_credentials(credentials):
+    """Get the user's email from Google using credentials"""
+    try:
+        service = build('oauth2', 'v2', credentials=credentials)
+        user_info = service.userinfo().get().execute()
+        return user_info.get('email')
+    except Exception as e:
+        print(f"Error getting user email: {e}")
+        return None
+
+
+def get_credentials(session_id: Optional[str] = None):
+    """Get credentials for a specific session/user"""
+    if not session_id:
+        return None
+    
     # Check memory cache first
-    if "credentials" in credentials_store:
-        creds = credentials_store["credentials"]
+    if session_id in credentials_cache:
+        creds = credentials_cache[session_id]
         # Refresh if expired
         if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            save_credentials(creds)
-            credentials_store["credentials"] = creds
+            try:
+                creds.refresh(Request())
+                save_credentials(creds, session_id)
+                credentials_cache[session_id] = creds
+            except Exception as e:
+                print(f"Error refreshing token: {e}")
+                # Token refresh failed, remove from cache
+                del credentials_cache[session_id]
+                return None
         return creds
     
-    # Try loading from database
-    creds = load_credentials()
+    # Try loading from database using session_id as user identifier
+    creds = load_credentials(session_id)
     if creds:
         # Refresh if expired
         if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            save_credentials(creds)
-        credentials_store["credentials"] = creds
+            try:
+                creds.refresh(Request())
+                save_credentials(creds, session_id)
+            except Exception as e:
+                print(f"Error refreshing token: {e}")
+                return None
+        credentials_cache[session_id] = creds
         return creds
     
     return None
 
+
 router = APIRouter()
 
+
 @router.get("/login")
-def login(redirect: bool = True, force: bool = False):
+def login(
+    redirect: bool = True, 
+    force: bool = False,
+    session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)
+):
     """
     Start Google OAuth login.
-    - Automatically skips login if already authenticated (unless force=True)
+    - Each user gets their own session
     - If redirect=True (default): Automatically redirects to Google login
     - If redirect=False: Returns the auth URL as JSON
     - If force=True: Forces re-authentication even if already logged in
     """
-    # Check if already authenticated
-    if not force:
-        creds = get_credentials()
+    # Check if already authenticated for this session
+    if not force and session_id:
+        creds = get_credentials(session_id)
         if creds and not creds.expired:
             if redirect:
-                return RedirectResponse(url="/auth/success")
+                return RedirectResponse(url=f"{FRONTEND_URL}?authenticated=true")
             return {
                 "message": "Already authenticated!",
                 "authenticated": True,
                 "hint": "Use /auth/login?force=true to re-authenticate"
             }
+    
+    # Generate a new state parameter that includes a new session ID
+    new_session_id = secrets.token_urlsafe(32)
     
     flow = Flow.from_client_config(
         {
@@ -80,24 +119,29 @@ def login(redirect: bool = True, force: bool = False):
 
     flow.redirect_uri = GOOGLE_REDIRECT_URI
 
-    auth_url, _ = flow.authorization_url(
+    # Use state parameter to pass session ID through OAuth flow
+    auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
+        state=new_session_id,  # Pass session ID in state
     )
 
     if redirect:
         return RedirectResponse(url=auth_url)
     
-    return {"auth_url": auth_url}
+    return {"auth_url": auth_url, "session_id": new_session_id}
 
 
 @router.get("/callback")
-def callback(code: str):
+def callback(code: str, state: str, response: Response):
     """
     OAuth callback - Google redirects here with authorization code
+    State parameter contains the session ID
     """
     try:
+        session_id = state  # Session ID passed through OAuth state
+        
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -115,52 +159,86 @@ def callback(code: str):
 
         credentials = flow.credentials
         
-        # Store in memory cache
-        credentials_store["credentials"] = credentials
+        # Store in memory cache with session ID
+        credentials_cache[session_id] = credentials
         
-        # Persist to MongoDB database
-        save_credentials(credentials)
-
-        # Redirect to frontend URL (from environment)
-        return RedirectResponse(url=FRONTEND_URL)
+        # Persist to MongoDB database with session ID as key
+        save_credentials(credentials, session_id)
+        
+        # Create redirect response with session cookie
+        redirect_response = RedirectResponse(url=FRONTEND_URL)
+        
+        # Set session cookie (HttpOnly, Secure in production)
+        is_production = os.getenv("VERCEL_ENV") == "production"
+        redirect_response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_id,
+            httponly=True,
+            secure=is_production,  # Only HTTPS in production
+            samesite="lax",
+            max_age=30 * 24 * 60 * 60,  # 30 days
+        )
+        
+        return redirect_response
+        
     except Exception as e:
         print(f"❌ OAuth callback error: {e}")
         raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
 
 
 @router.get("/success")
-def auth_success():
+def auth_success(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
     """Success page after authentication"""
-    creds = get_credentials()
+    creds = get_credentials(session_id)
     if creds:
+        user_email = get_user_email_from_credentials(creds)
         return {
             "message": "✅ Authentication successful!",
             "status": "logged_in",
+            "user_email": user_email,
             "session_persisted": True,
             "token_expiry": str(creds.expiry) if creds.expiry else None,
-            "hint": "Your session is saved. You won't need to login again even after server restart!"
         }
     return {"message": "Not authenticated", "status": "logged_out"}
 
 
 @router.get("/status")
-def auth_status():
+def auth_status(session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)):
     """Check if user is authenticated"""
-    creds = get_credentials()
+    creds = get_credentials(session_id)
     if creds:
+        user_email = get_user_email_from_credentials(creds)
         return {
             "authenticated": True,
             "expired": creds.expired,
             "expiry": str(creds.expiry) if creds.expiry else None,
+            "user_email": user_email,
         }
     return {"authenticated": False}
 
 
 @router.post("/logout")
-def logout():
-    """Clear stored credentials"""
-    credentials_store.clear()
-    delete_credentials()
+def logout(
+    response: Response,
+    session_id: Optional[str] = Cookie(None, alias=SESSION_COOKIE_NAME)
+):
+    """Clear stored credentials for current user session"""
+    if session_id:
+        # Remove from memory cache
+        if session_id in credentials_cache:
+            del credentials_cache[session_id]
+        # Remove from database
+        delete_credentials(session_id)
+    
+    # Clear the session cookie
+    response.delete_cookie(key=SESSION_COOKIE_NAME)
+    
     return {"message": "Logged out successfully"}
+
+
+@router.get("/users")
+def list_users():
+    """List all authenticated users (admin endpoint)"""
+    return {"users": get_all_users()}
 
 

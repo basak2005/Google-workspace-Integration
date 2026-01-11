@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 from auth.router import get_credentials
+from auth.dependencies import require_session
 from google_services.keep_service import (
     list_notes,
     get_note,
@@ -94,7 +95,7 @@ def get_notes(
     page_size: int = 100,
     page_token: str = None,
     filter: str = None,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     List notes from Google Keep
@@ -105,6 +106,9 @@ def get_notes(
     
     Returns notes with pagination token if more results exist.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         result = list_notes(
             credentials,
@@ -128,7 +132,7 @@ def get_notes(
 @router.get("/notes/all")
 def get_all_notes_endpoint(
     include_trashed: bool = False,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Get all notes (handles pagination automatically)
@@ -137,6 +141,9 @@ def get_all_notes_endpoint(
     
     Warning: May take time for accounts with many notes.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         notes = get_all_notes(credentials, include_trashed=include_trashed)
         formatted_notes = [format_note_for_display(note) for note in notes]
@@ -152,7 +159,7 @@ def get_all_notes_endpoint(
 @router.get("/notes/{note_id}")
 def get_single_note(
     note_id: str,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Get a specific note by ID
@@ -161,6 +168,9 @@ def get_single_note(
     
     Returns full note details including content, permissions, and attachments.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         note = get_note(credentials, note_id)
         return format_note_for_display(note)
@@ -173,7 +183,7 @@ def get_single_note(
 @router.post("/notes/text")
 def create_text_note_endpoint(
     note: TextNoteCreate,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Create a new text note
@@ -183,6 +193,9 @@ def create_text_note_endpoint(
     
     Returns the created note.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         created = create_text_note(credentials, title=note.title, text=note.text)
         return format_note_for_display(created)
@@ -193,7 +206,7 @@ def create_text_note_endpoint(
 @router.post("/notes/list")
 def create_list_note_endpoint(
     note: ListNoteCreate,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Create a new checklist/list note
@@ -203,6 +216,9 @@ def create_list_note_endpoint(
     
     Returns the created note.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         items = [{"text": item.text, "checked": item.checked} for item in note.items]
         created = create_list_note(credentials, title=note.title, items=items)
@@ -216,7 +232,7 @@ def create_note_endpoint(
     title: str,
     text: str = None,
     items: List[ListItem] = None,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Create a note (text or list)
@@ -227,6 +243,9 @@ def create_note_endpoint(
     
     Provide either text OR items, not both.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         list_items = None
         if items:
@@ -246,7 +265,7 @@ def create_note_endpoint(
 @router.delete("/notes/{note_id}")
 def delete_note_endpoint(
     note_id: str,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Delete a note (moves to trash)
@@ -255,6 +274,9 @@ def delete_note_endpoint(
     
     Returns confirmation of deletion.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         result = delete_note(credentials, note_id)
         return result
@@ -270,7 +292,7 @@ def delete_note_endpoint(
 def share_note(
     note_id: str,
     request: ShareNoteRequest,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Share a note with other users
@@ -280,6 +302,9 @@ def share_note(
     
     Returns created permissions.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         members = [{"email": m.email, "role": m.role} for m in request.members]
         result = add_permissions(credentials, note_id, members)
@@ -292,7 +317,7 @@ def share_note(
 def unshare_note(
     note_id: str,
     request: RemovePermissionsRequest,
-    credentials=Depends(get_credentials)
+    session_id: str = Depends(require_session)
 ):
     """
     Remove sharing permissions from a note
@@ -302,6 +327,9 @@ def unshare_note(
     
     Returns confirmation.
     """
+    credentials = get_credentials(session_id)
+    if not credentials:
+        raise HTTPException(status_code=401, detail="User not authenticated")
     try:
         result = remove_permissions(credentials, note_id, request.permission_names)
         return result

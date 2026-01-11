@@ -1,10 +1,11 @@
 """
 Google Tasks API Routes
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from googleapiclient.errors import HttpError
 from auth.router import get_credentials
+from auth.dependencies import require_session
 from google_services.tasks_service import (
     list_task_lists,
     list_tasks,
@@ -23,9 +24,9 @@ class TaskCreate(BaseModel):
 
 
 @router.get("/lists")
-def get_task_lists():
+def get_task_lists(session_id: str = Depends(require_session)):
     """Get all task lists"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated. Visit /auth/login first.")
     try:
@@ -35,9 +36,9 @@ def get_task_lists():
 
 
 @router.get("/")
-def get_tasks(task_list_id: str = "@default"):
+def get_tasks(task_list_id: str = "@default", session_id: str = Depends(require_session)):
     """Get all tasks in a task list"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated. Visit /auth/login first.")
     try:
@@ -47,9 +48,9 @@ def get_tasks(task_list_id: str = "@default"):
 
 
 @router.post("/")
-def add_task(task: TaskCreate):
+def add_task(task: TaskCreate, session_id: str = Depends(require_session)):
     """Create a new task"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated. Visit /auth/login first.")
     try:
@@ -64,9 +65,9 @@ def add_task(task: TaskCreate):
 
 
 @router.put("/{task_id}/complete")
-def mark_complete(task_id: str, task_list_id: str = "@default"):
+def mark_complete(task_id: str, task_list_id: str = "@default", session_id: str = Depends(require_session)):
     """Mark a task as completed"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated. Visit /auth/login first.")
     try:
@@ -76,9 +77,9 @@ def mark_complete(task_id: str, task_list_id: str = "@default"):
 
 
 @router.delete("/{task_id}")
-def remove_task(task_id: str, task_list_id: str = "@default"):
+def remove_task(task_id: str, task_list_id: str = "@default", session_id: str = Depends(require_session)):
     """Delete a task"""
-    credentials = get_credentials()
+    credentials = get_credentials(session_id)
     if not credentials:
         raise HTTPException(status_code=401, detail="User not authenticated. Visit /auth/login first.")
     try:
